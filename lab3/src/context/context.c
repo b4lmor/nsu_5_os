@@ -3,40 +3,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-Context *init_context(const size_t mutex_number) {
-    Context *context = malloc(sizeof(Context));
+proxy_context_t *init_context(const size_t mutex_number) {
+    proxy_context_t *context = malloc(sizeof(proxy_context_t));
     if (context == NULL) {
         return NULL;
     }
-    context->last_cached_urls = malloc(sizeof(char *) * mutex_number);
-    if (context->last_cached_urls == NULL) {
-        free(context);
+    context->map = create_table();
+    if (context->map == NULL) {
+        perror("create_map");
         return NULL;
-    }
-    context->mutex_number = mutex_number;
-    context->mutexes = (pthread_mutex_t *) malloc(sizeof(pthread_mutex_t) * mutex_number);
-    for (int i = 0; i < mutex_number; i++) {
-        if (pthread_mutex_init(&context->mutexes[i], NULL) != 0) {
-            fprintf(stderr, "Ошибка инициализации мьютекса %d\n", i);
-            for (int j = 0; j < i; j++) {
-                pthread_mutex_destroy(&context->mutexes[j]);
-                free(context->last_cached_urls);
-            }
-            free(context->mutexes);
-            free(context);
-            return NULL;
-        }
     }
     return context;
 }
 
-void destroy_context(Context **context) {
-    if (*context == NULL) {
+void destroy_context(proxy_context_t **context) {
+    if (context == NULL || *context == NULL) {
         return;
     }
-    if ((*context)->mutexes != NULL) {
-        free((*context)->mutexes);
-    }
+    destroy_hashmap(&(*context)->map);
     free(*context);
     *context = NULL;
 }

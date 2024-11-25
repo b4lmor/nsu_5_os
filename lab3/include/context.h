@@ -2,16 +2,15 @@
 #define CONTEXT_H
 
 #include <stddef.h>
-#include <pthread.h>
+#include "hashmap.h"
 
 typedef struct {
-    size_t mutex_number;
-    pthread_mutex_t *mutexes;
-    char **last_cached_urls;
-} Context;
+    int port;
+    hashmap_t *map;
+} proxy_context_t;
 
-Context *init_context(size_t mutex_number);
+proxy_context_t *init_context(size_t mutex_number);
 
-void destroy_context(Context **context);
+void destroy_context(proxy_context_t **context);
 
 #endif

@@ -7,7 +7,7 @@
 #include "../../include/server.h"
 #include "../../include/handler.h"
 
-int start_server(const int port, Context *context) {
+int start_server(const int port, proxy_context_t *context) {
     struct sockaddr_in server_addr, client_addr;
     socklen_t client_len = sizeof(client_addr);
 

@@ -5,6 +5,6 @@
 
 #include "context.h"
 
-int start_server(int port, Context *context);
+int start_server(int port, proxy_context_t *context);
 
 #endif

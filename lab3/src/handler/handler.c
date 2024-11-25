@@ -9,40 +9,38 @@
 #include "../../include/http_utils.h"
 #include "../../include/common.h"
 
-#define PARALLEL 0
-
 #define CACHE_TTL_MS 1000000
 #define MAX_CACHE_NAME_LENGTH 30
 
-typedef struct {
-    Context *context;
+typedef struct client_data {
+    proxy_context_t *context;
     int fd;
-} Data;
+} client_data_t;
 
 int receive_client_request(int client_socket, char *buffer);
 
 void serve_cached_file(const char *cache_filename, int client_socket);
 
-int fetch_and_cache_request(const HttpRequest *request, const char *cache_filename, int fd);
+int fetch_and_cache_request(const http_request_t *request, const char *cache_filename, int fd);
 
-int validate_request(const HttpRequest *request);
+int validate_request(const http_request_t *request);
 
 void *__handle_client(void *arg) {
-    const Data *data = arg;
+    const client_data_t *data = arg;
     const int client_socket = data->fd;
 
-    char buffer_request[MAX_REQUEST_SIZE] = {0};
+    char buffer_request[HTTP_REQUEST_BYTES_LEN] = {0};
     if (receive_client_request(client_socket, buffer_request) < 0) {
         goto finally;
     }
 
-    HttpRequest request;
+    http_request_t request;
     if (parse_http_request(buffer_request, &request) < 0) {
         perror("parse_http_request");
         goto finally;
     }
 
-    const int cache_hash = hash(request.path) % data->context->mutex_number;
+    const int cache_hash = hashn(request.path, TODO) % data->context->mutex_number;
     printf("[%d] :: Request url: %s | hash: %d\n", client_socket, request.path, cache_hash);
 
     if (strncmp(request.version, "HTTPS", 5) == 0) {
@@ -89,8 +87,8 @@ finally:
     return NULL;
 }
 
-int handle_client(const int client_socket, Context *context) {
-    Data *data = malloc(sizeof(Data));
+int handle_client(const int client_socket, proxy_context_t *context) {
+    client_data_t *data = malloc(sizeof(client_data_t));
     data->context = context;
     data->fd = client_socket;
 #if PARALLEL
@@ -109,7 +107,7 @@ int handle_client(const int client_socket, Context *context) {
 }
 
 int receive_client_request(const int client_socket, char *buffer) {
-    const int bytes_read = recv(client_socket, buffer, MAX_REQUEST_SIZE - 1, 0);
+    const int bytes_read = recv(client_socket, buffer, HTTP_REQUEST_BYTES_LEN - 1, 0);
     if (bytes_read < 0) {
         perror("recv");
         return -1;
@@ -118,13 +116,13 @@ int receive_client_request(const int client_socket, char *buffer) {
     return 0;
 }
 
-int fetch_and_cache_request(const HttpRequest *request, const char *cache_filename, const int fd) {
+int fetch_and_cache_request(const http_request_t *request, const char *cache_filename, const int fd) {
     FILE *cache_file = fopen(cache_filename, "ab");
     if (!cache_file) return -1;
-    HttpContext context;
-    context.id = fd;
-    context.out = cache_file;
-    context.last_logged_percentage = 0;
+    request_context_t context;
+    // context.id = fd;
+    // context.out = cache_file;
+    context.downloaded = 0;
     const int err = send_http_request(request, &context);
     fclose(cache_file);
     return err;
@@ -143,6 +141,6 @@ void serve_cached_file(const char *cache_filename, const int client_socket) {
     }
 }
 
-int validate_request(const HttpRequest *request) {
+int validate_request(const http_request_t *request) {
     return strncmp(request->version, SUPPORTED_VERSION, strlen(SUPPORTED_VERSION)) == 0;
 }

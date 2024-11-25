@@ -7,7 +7,7 @@
 #define PORT 8080
 
 int main() {
-    Context *context = init_context(50);
+    proxy_context_t *context = init_context(50);
     const int err = start_server(PORT, context);
     if (err) {
         perror("Error starting server");

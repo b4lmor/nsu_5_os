@@ -2,41 +2,38 @@
 #define HTTP_UTILS_H
 
 #include <stdio.h>
+#include "subscription.h"
 
-#define LOG_ITERATION_COUNT 30000
-#define MAX_REQUEST_SIZE 4096
-#define URL_MAX_SIZE 512
-#define SUPPORTED_VERSION "HTTP/1.0"
-#define TIME_FORMAT "%02d-%02d-%04d %02d:%02d:%02d\n"
+#define HTTP_REQUEST_BYTES_LEN 4096
 
-typedef struct {
-    int id;
-    FILE *out;
-    size_t last_logged_percentage;
-} HttpContext;
+#define HTTP_METHOD_LEN 8
+#define HTTP_VERSION_LEN 16
+#define HTTP_PATH_LEN 512
+#define HTTP_BODY_LEN 512
+#define HTTP_HEADER_COUNT 16
+#define HTTP_HEADER_LEN 256
 
-typedef struct {
-    int header_count;
-    char method[8];
-    char version[16];
-    char path[URL_MAX_SIZE];
-    char body[512];
-    char headers[10][256];
-} HttpRequest;
+#define ACCEPT_TIMEOUT_MS 5000L
 
-typedef enum {
-    UNDEFINED = -1,
-    CONNECT = 100,
-    GET = 1,
-    POST = 2,
-    PUT = 3,
-    DELETE = 4,
-    HEAD = 5,
-    PATCH = 6,
-} Methods;
+typedef struct http_request {
+    size_t header_count;
+    char method[HTTP_METHOD_LEN];
+    char version[HTTP_VERSION_LEN];
+    char path[HTTP_PATH_LEN];
+    char body[HTTP_BODY_LEN];
+    char headers[HTTP_HEADER_COUNT][HTTP_HEADER_LEN];
+} http_request_t;
 
-int parse_http_request(const char *raw_request, HttpRequest *request);
+typedef struct request_context {
+    size_t downloaded;
+    http_request_t *request;
+    subscription_manager_t *manager;
+} request_context_t;
 
-int send_http_request(const HttpRequest *request, HttpContext *context);
+request_context_t *create_request_context(http_request_t *request, subscription_manager_t *manager);
+
+http_request_t* parse_http_request(const char *request_bytes);
+
+int send_http_request(request_context_t *context);
 
 #endif

@@ -3,16 +3,8 @@
 
 #include <stdio.h>
 
-void bijection_url_filename(const char *path, char *filename);
+unsigned int hashn(const char *str, size_t max_size);
 
-void bijection_filename_url(const char *filename, char *url);
-
-void write_file_to_fd(FILE *file, int fd, int skip_lines);
-
-void append_file(FILE *src, FILE *dest);
-
-int check_cache_expiration(const char *path, long max_diff);
-
-unsigned long hash(const char *str);
+int send_data_to_fd(int fd, const void *data, size_t size);
 
 #endif
