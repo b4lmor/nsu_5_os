@@ -6,6 +6,7 @@
 chunk_container_t *create_chunk_container() {
     chunk_container_t *container = malloc(sizeof(chunk_container_t));
     if (!container) {
+        perror("malloc container");
         return NULL;
     }
     container->first = NULL;

@@ -17,7 +17,6 @@ add_executable(c-proxy
         src/server/server.c
         include/handler.h
         src/handler/handler.c
-        src/handler/handler_new.c
         include/chunk.h
         src/chunk/chunk.c
         include/subscription.h
@@ -26,12 +25,19 @@ add_executable(c-proxy
         src/common/hashmap.c
         include/log.h
         src/log/log.c
+        include/cache.h
+        src/chunk/cache.c
+        include/threadpool.h
+        src/threadpool/threadpool.c
 )
 target_link_libraries(c-proxy ${CURL_LIBRARIES})
 target_include_directories(c-proxy PRIVATE ${CURL_INCLUDE_DIRS})
-#target_compile_definitions(c-proxy PRIVATE USE_THREADS)
+target_compile_definitions(c-proxy PRIVATE PARALLEL)
 
-add_executable(test test/main.c)
+add_executable(test test/main.c
+        include/threadpool.h
+        src/threadpool/threadpool.c
+)
 
 target_link_libraries(test ${CURL_LIBRARIES})
 target_include_directories(test PRIVATE ${CURL_INCLUDE_DIRS})

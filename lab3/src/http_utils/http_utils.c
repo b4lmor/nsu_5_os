@@ -1,4 +1,4 @@
- #include "../../include/http_utils.h"
+#include "../../include/http_utils.h"
 #include "../../include/common.h"
 #include "../../include/log.h"
 #include <string.h>
@@ -6,23 +6,23 @@
 
 typedef enum http_method {
     UNDEFINED = -1,
-    GET = 1,
-    POST = 2,
-    PUT = 3,
-    DELETE = 4,
-    HEAD = 5,
-    PATCH = 6,
+    GET,
+    POST,
+    PUT,
+    DELETE,
+    HEAD,
+    PATCH
 } __http_method_t;
 
 int __parse_http_request(const char *request_bytes, http_request_t *request);
 
-int __prepare_curl(CURL *curl, struct curl_slist *headers, request_context_t *context);
+int __prepare_headers(struct curl_slist **headers, request_context_t *context);
 
 __http_method_t __parse_method(const char *str);
 
 static size_t callback(const void *contents, const size_t size, const size_t nmemb, void *userp) {
     const request_context_t *context = userp;
-    add_chunk(context->manager, contents, size, nmemb); // todo: parallel ???
+    add_chunk(context->manager, contents, size, nmemb, context->proxy_context);
     return size * nmemb;
 }
 
@@ -30,15 +30,18 @@ static int xferinfo_callback(void *clientp, curl_off_t const dltotal, const curl
     request_context_t *context = clientp;
     if (dltotal > 0) {
         const double progress = dlnow / (double)dltotal * 100;
-        if (progress >= 33 && context->downloaded < 33) {
-            logs(context->request->path, "Downloaded: 33% ...");
-            context->downloaded = 33;
-        } else if (progress >= 66 && context->downloaded < 66) {
-            logs(context->request->path, "Downloaded: 66% ...");
-            context->downloaded = 66;
-        } else if (progress >= 100 && context->downloaded < 100) {
-            logs(context->request->path, "Downloaded: 100% ... Completed!");
-            context->downloaded = 100;
+        if (progress >= 0 && context->downloaded_quarter == 0) {
+            logurls(context->request->path, "Downloaded: 0% ... Started!");
+            context->downloaded_quarter = 1;
+        } else if (progress >= 33 && context->downloaded_quarter < 2) {
+            logurls(context->request->path, "Downloaded: 33% ...");
+            context->downloaded_quarter = 2;
+        } else if (progress >= 66 && context->downloaded_quarter < 3) {
+            logurls(context->request->path, "Downloaded: 66% ...");
+            context->downloaded_quarter = 3;
+        } else if (progress >= 100 && context->downloaded_quarter < 4) {
+            logurls(context->request->path, "Downloaded: 100% ... Completed!");
+            context->downloaded_quarter = 4;
         }
     }
     return 0;
@@ -50,38 +53,68 @@ int send_http_request(request_context_t *context) {
         perror("Failed to initialize libcurl");
         return -1;
     }
-    struct curl_slist *headers = NULL;
     long response = -1;
 
-    if (__prepare_curl(curl, headers, context)) {
-        perror("Failed to prepare curl");
-        curl_easy_cleanup(curl);
-        return response;
+    curl_easy_setopt(curl, CURLOPT_URL, context->request->path);
+
+    struct curl_slist *headers = NULL;
+    if (__prepare_headers(&headers, context)) {
+        perror("Failed to prepare headers");
+        goto end;
+    }
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+    switch (__parse_method(context->request->method)) {
+        case POST:
+            curl_easy_setopt(curl, CURLOPT_POST, 1L);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, context->request->body);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(context->request->body));
+            break;
+        case PUT:
+            curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, context->request->body);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(context->request->body));
+            break;
+        case DELETE:
+            curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+            break;
+        default:
+            break;
     }
 
+    curl_easy_setopt(curl, CURLOPT_ACCEPTTIMEOUT_MS, ACCEPT_TIMEOUT_MS);
+    curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, callback);
+    curl_easy_setopt(curl, CURLOPT_HEADERDATA, context);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, context);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xferinfo_callback);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, context);
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+
     const CURLcode res = curl_easy_perform(curl);
-    finish_pending_chunks(context->manager);
     if (res != CURLE_OK) {
         fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
     } else {
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response);
     }
     curl_slist_free_all(headers);
+end:
     curl_easy_cleanup(curl);
     return response;
 }
 
- request_context_t *create_request_context(http_request_t *request, subscription_manager_t *manager) {
-    request_context_t *context = (request_context_t *) malloc(sizeof(request_context_t));
+request_context_t *create_request_context(http_request_t *request, subscription_manager_t *manager, proxy_context_t *proxy_context) {
+    request_context_t *context = malloc(sizeof(request_context_t));
     if (context == NULL) {
         perror("Failed to allocate memory for request_context_t");
         return NULL;
     }
     context->manager = manager;
     context->request = request;
-    context->downloaded = 0;
+    context->proxy_context = proxy_context;
+    context->downloaded_quarter = 0;
     return context;
- }
+}
 
 http_request_t *parse_http_request(const char *request_bytes) {
     http_request_t *result = malloc(sizeof(http_request_t));
@@ -97,9 +130,7 @@ http_request_t *parse_http_request(const char *request_bytes) {
     return result;
 }
 
-int __prepare_curl(CURL *curl, struct curl_slist **headers, request_context_t *context) {
-    curl_easy_setopt(curl, CURLOPT_URL, context->request->path);
-
+int __prepare_headers(struct curl_slist **headers, request_context_t *context) {
     *headers = curl_slist_append(*headers, "Accept-Encoding:");
     if (*headers == NULL) {
         perror("Failed to create curl slist");
@@ -108,38 +139,6 @@ int __prepare_curl(CURL *curl, struct curl_slist **headers, request_context_t *c
     for (int i = 0; i < context->request->header_count; i++) {
         *headers = curl_slist_append(*headers, context->request->headers[i]);
     }
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-    switch (__parse_method(context->request->method)) {
-        case GET:
-            // curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L); // todo: delete ?
-        break;
-        case POST:
-            curl_easy_setopt(curl, CURLOPT_POST, 1L);
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, context->request->body);
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(context->request->body));
-        break;
-        case PUT:
-            curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, context->request->body);
-            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(context->request->body));
-        break;
-        case DELETE:
-            curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
-        break;
-        default:
-            break;
-    }
-
-    curl_easy_setopt(curl, CURLOPT_ACCEPTTIMEOUT_MS, ACCEPT_TIMEOUT_MS);
-    curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, callback);
-    curl_easy_setopt(curl, CURLOPT_HEADERDATA, context);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, context);
-    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xferinfo_callback);
-    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, context);
-    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
-
     return 0;
 }
 
@@ -193,7 +192,7 @@ __http_method_t __parse_method(const char *str) {
     } else if (strcmp(str, "PATCH") == 0) {
         method = PATCH;
     } else {
-        perror("Can't parse method");
+        logsss("__parse_method()", "Unsupported method", str);
     }
     return method;
 }

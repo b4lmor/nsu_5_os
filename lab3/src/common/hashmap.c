@@ -37,7 +37,7 @@ void *get(hashmap_t *ht, const char *key) {
     const unsigned int index = hashn(key, MAX_KEY_LENGTH) % TABLE_SIZE;
     const node_t *current = ht->table[index];
     while (current != NULL) {
-        if (strcmp(current->key, key) == 0) {
+        if (strncmp(current->key, key, MAX_KEY_LENGTH) == 0) {
             return current->value;
         }
         current = current->next;
@@ -45,12 +45,12 @@ void *get(hashmap_t *ht, const char *key) {
     return NULL;
 }
 
-void delete(hashmap_t *ht, const char *key) {
+void delete(const hashmap_t *ht, const char *key) {
     const unsigned int index = hashn(key, MAX_KEY_LENGTH) % TABLE_SIZE;
     node_t *current = ht->table[index];
     node_t *previous = NULL;
     while (current != NULL) {
-        if (strcmp(current->key, key) == 0) {
+        if (strncmp(current->key, key, MAX_KEY_LENGTH) == 0) {
             if (previous == NULL) {
                 ht->table[index] = current->next;
             } else {

@@ -2,6 +2,8 @@
 #define HTTP_UTILS_H
 
 #include <stdio.h>
+
+#include "context.h"
 #include "subscription.h"
 
 #define HTTP_REQUEST_BYTES_LEN 4096
@@ -25,12 +27,13 @@ typedef struct http_request {
 } http_request_t;
 
 typedef struct request_context {
-    size_t downloaded;
+    size_t downloaded_quarter;
     http_request_t *request;
     subscription_manager_t *manager;
+    proxy_context_t *proxy_context;
 } request_context_t;
 
-request_context_t *create_request_context(http_request_t *request, subscription_manager_t *manager);
+request_context_t *create_request_context(http_request_t *request, subscription_manager_t *manager, proxy_context_t *proxy_context);
 
 http_request_t* parse_http_request(const char *request_bytes);
 

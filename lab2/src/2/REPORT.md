@@ -12,7 +12,7 @@
 - Queue statistics:
   + Queue occupancy: 0 - 100% (various)
   + Read-write attempts: add < get
-  + Read-write counts: 1514343320 | 1514343320
+  + Read-write counts: 1514343320 | 1514343320 (10)
 ---
 
 ## Mutex
@@ -27,7 +27,7 @@
 - Queue statistics:
     + Queue occupancy: 0 - 10%
     + Read-write attempts: add < get
-    + Read-write counts: 1799105766 | 1799090020 
+    + Read-write counts: 1799105766 | 1799090020 (10) 
 ---
 
 ## Condition variable
@@ -38,11 +38,11 @@
 - Emulate sleep: no
 ---
 - Processor load: ~25%
-- User mode / Kernel mode (ms): 189999 / 59468
+- User mode / Kernel mode (ms): 186501 / 63633
 - Queue statistics:
     + Queue occupancy: 0 - 4% (mostly: 0-1 element)
     + Read-write attempts: add < get (10k-30k diff)
-    + Read-write counts: 1480514009 | 1480478120
+    + Read-write counts:  1925174005 | 1925128931 (10)
 ---
 
 ## Semaphore
@@ -53,9 +53,9 @@
 - Emulate sleep: no
 ---
 - Processor load: ~25%
-- User mode / Kernel mode (ms): 248969 / 286
+- User mode / Kernel mode (ms): 133219 / 116779
 - Queue statistics:
-    + Queue occupancy: 0 - 6%
-    + Read-write attempts: add < get
-    + Read-write counts: 1776317701 | 1776291990
+    + Queue occupancy: 0 - 3%
+    + Read-write attempts: add ~= get
+    + Read-write counts: 1098217147 | 1098217146 (10)
 ---

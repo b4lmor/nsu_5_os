@@ -25,6 +25,7 @@ typedef struct _node_t {
 
 typedef struct _linked_list_t {
     node_t *first;
+    char stop;
 } linked_list_t;
 
 node_t *create_node(const char *val);

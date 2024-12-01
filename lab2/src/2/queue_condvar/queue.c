@@ -84,10 +84,8 @@ int queue_add(queue_t *q, const int val) {
     new->next = NULL;
 
     if (!q->first) {
-        // here we can miss a value
         q->first = q->last = new;
     } else {
-        // bcz of that
         q->last->next = new;
         q->last = q->last->next;
     }
@@ -103,13 +101,13 @@ int queue_add(queue_t *q, const int val) {
 int queue_get(queue_t *q, int *val) {
     pthread_mutex_lock(&q->mutex);
     while (q->count == 0) {
-        pthread_cond_wait(&q->condvar, &q->mutex);
+        pthread_cond_wait(&q->condvar, &q->mutex); // todo
     }
 
     q->get_attempts++;
 
     assert(q->count >= 0);
-    if (q->count == 0) { // || q->first == NULL) // ???
+    if (q->count == 0) {
         pthread_mutex_unlock(&q->mutex);
         return 0;
     }

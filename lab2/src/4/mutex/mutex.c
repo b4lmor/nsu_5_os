@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include "mutex.h"
 
+#include <pthread.h>
+
 #define STATUS_LOCK 0
 #define STATUS_UNLOCK 1
 #define NO_TID -1
@@ -18,10 +20,10 @@ int futex(void *uaddr, const int futex_op, const int val, const struct timespec 
 }
 
 int futex_wait(my_mutex_t *futex_addr) {
-    const int err = futex(futex_addr, FUTEX_WAIT, STATUS_LOCK, NULL, NULL, 0);
+    const int err = futex(futex_addr, FUTEX_WAIT, 0, NULL, NULL, 0);
     if (err < 0 && errno != EAGAIN) {
         printf("futex_wait [%d %d %d]: FUTEX_WAIT error: %s\n", getpid(), getppid(), gettid(), strerror(errno));
-        return 1;
+        return -1;
     }
     return 0;
 }
@@ -30,13 +32,13 @@ int futex_wake(my_mutex_t *futex_addr) {
     const int futex_rc = futex(futex_addr, FUTEX_WAKE, 1, NULL, NULL, 0);
     if (futex_rc < 0 && errno != EAGAIN) {
         printf("futex_wake [%d %d %d]: FUTEX_WAKE error: %s\n", getpid(), getppid(), gettid(), strerror(errno));
-        return 1;
+        return -1;
     }
     return 0;
 }
 
 void mutex_init(my_mutex_t *m) {
-    m->lock = 1;
+    m->lock = STATUS_UNLOCK;
     m->tid = NO_TID;
 }
 
@@ -51,9 +53,9 @@ void mutex_lock(my_mutex_t *m) {
 }
 
 void mutex_unlock(my_mutex_t *m) {
-    if (m->tid != gettid()) {
+    if (!pthread_equal(m->tid, gettid())) {
         printf("mutex_unlock [%d %d %d]: not access\n", getpid(), getppid(), gettid());
-        abort();
+        return;
     }
     int expected = STATUS_LOCK;
     if (atomic_compare_exchange_strong(&m->lock, &expected, STATUS_UNLOCK)) {

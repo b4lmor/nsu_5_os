@@ -1,113 +1,149 @@
-#define _GNU_SOURCE
-#include <stdio.h>
-#include <pthread.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/socket.h>
 #include "../../include/handler.h"
+#include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #include "../../include/http_utils.h"
+#include "../../include/log.h"
+#include "../../include/cache.h"
 #include "../../include/common.h"
-
-#define CACHE_TTL_MS 1000000
-#define MAX_CACHE_NAME_LENGTH 30
 
 typedef struct client_data {
     proxy_context_t *context;
     int fd;
 } client_data_t;
 
-int receive_client_request(int client_socket, char *buffer);
+typedef struct session_data {
+    subscription_manager_t *manager;
+    http_request_t *request;
+    proxy_context_t *context;
+} session_data_t;
 
-void serve_cached_file(const char *cache_filename, int client_socket);
+void *__handle_client(void *arg);
 
-int fetch_and_cache_request(const http_request_t *request, const char *cache_filename, int fd);
+void *__share_cache(void *arg);
 
-int validate_request(const http_request_t *request);
+void *__download_and_send(void *arg);
 
-void *__handle_client(void *arg) {
-    const client_data_t *data = arg;
-    const int client_socket = data->fd;
+session_data_t *__create_session_data(subscription_manager_t *manager, http_request_t *request, proxy_context_t *context);
 
-    char buffer_request[HTTP_REQUEST_BYTES_LEN] = {0};
-    if (receive_client_request(client_socket, buffer_request) < 0) {
-        goto finally;
-    }
+int __recv(int fd, char *buffer);
 
-    http_request_t request;
-    if (parse_http_request(buffer_request, &request) < 0) {
-        perror("parse_http_request");
-        goto finally;
-    }
+int __validate_request(const http_request_t *request);
 
-    const int cache_hash = hashn(request.path, TODO) % data->context->mutex_number;
-    printf("[%d] :: Request url: %s | hash: %d\n", client_socket, request.path, cache_hash);
+int __check_cache(const http_request_t *request);
 
-    if (strncmp(request.version, "HTTPS", 5) == 0) {
-        printf("Got HTTPS request!\n");
-        goto finally;
-    }
-
-    if (!validate_request(&request)) {
-        printf("[%d] :: Warning: Expected protocol '%s', but got '%s'\n",
-               client_socket, SUPPORTED_VERSION, request.version);
-    }
-
-    pthread_mutex_lock(&data->context->mutexes[cache_hash]);
-
-    char *cache_file_name = calloc(MAX_CACHE_NAME_LENGTH, sizeof(char));
-    snprintf(cache_file_name, MAX_CACHE_NAME_LENGTH - 1, "../cache/%d.cache", cache_hash);
-
-    if ((data->context->last_cached_urls[cache_hash] == NULL
-        ||strncmp(cache_file_name, data->context->last_cached_urls[cache_hash], MAX_CACHE_NAME_LENGTH) == 0)
-        && check_cache_expiration(cache_file_name, CACHE_TTL_MS) == 0) {
-        printf("[%d] :: Cache file found!\n", client_socket);
-    } else {
-        printf("[%d] :: Cache file not found. Sending request ...\n", client_socket);
-        if (fetch_and_cache_request(&request, cache_file_name, client_socket) < 0) {
-            printf("[%d] :: Failed to send request\n", client_socket);
-            pthread_mutex_unlock(&data->context->mutexes[cache_hash]);
-            goto finally;
-        }
-    }
-
-    serve_cached_file(cache_file_name, client_socket);
-
-    if (data->context->last_cached_urls[cache_hash] != NULL) {
-        free(data->context->last_cached_urls[cache_hash]);
-    }
-    data->context->last_cached_urls[cache_hash] = cache_file_name;
-
-    pthread_mutex_unlock(&data->context->mutexes[cache_hash]);
-
-finally:
-    close(client_socket);
-    printf("[%d] :: Socket closed\n", client_socket);
-    free(arg);
-    return NULL;
-}
+int __check_response_code(int code);
 
 int handle_client(const int client_socket, proxy_context_t *context) {
     client_data_t *data = malloc(sizeof(client_data_t));
     data->context = context;
     data->fd = client_socket;
-#if PARALLEL
-    pthread_t thread;
-    if (pthread_create(&thread, NULL, __handle_client, data) < 0) {
-        perror("pthread_create");
-        free(data);
-        close(client_socket);
-        printf("[%d] :: Socket closed\n", client_socket);
-        return -1;
-    }
+#ifdef PARALLEL
+    threadpool_push_task(context->pool, __handle_client, data);
 #else
     __handle_client(data);
 #endif
     return 0;
 }
 
-int receive_client_request(const int client_socket, char *buffer) {
-    const int bytes_read = recv(client_socket, buffer, HTTP_REQUEST_BYTES_LEN - 1, 0);
+// @parallel
+void *__handle_client(void *arg) {
+    client_data_t *data = arg;
+    const int fd = data->fd;
+    http_request_t *request = NULL;
+
+    char request_buf[HTTP_REQUEST_BYTES_LEN] = {0};
+    if (__recv(fd, request_buf) < 0) {
+        close(fd);
+        goto end;
+    }
+
+    request = parse_http_request(request_buf);
+    if (request == NULL) {
+        close(fd);
+        goto end;
+    }
+
+    logiss(fd, "request url:", request->path);
+
+    if (__validate_request(request) < 0) {
+        logis(fd, "invalid request!");
+        close(fd);
+        goto end;
+    }
+
+    subscription_manager_t *manager = get(data->context->map, request->path);
+    if (manager == NULL) {
+        manager = create_subscription_manager();
+        if (manager == NULL) {
+            close(fd);
+            goto end;
+        }
+        insert(data->context->map, request->path, manager);
+    }
+
+    subscribe(manager, fd);
+
+    if (cas(&manager->is_busy, 0, 1)) { // true => this thread is session main thread
+        session_data_t *session = __create_session_data(manager, request, data->context);
+        if (session == NULL) {
+            destroy_subscription_manager(&manager);
+            delete(data->context->map, request->path);
+            goto end;
+        }
+        if (__check_cache(request) != 0) {
+            logis(fd, "cache file not found.");
+            __download_and_send(session);
+        } else {
+            logis(fd, "cache file found!");
+            __share_cache(session);
+        }
+        finish_pending_chunks(manager);
+        destroy_subscription_manager(&manager);
+        delete(data->context->map, request->path);
+    }
+end:
+    free(request);
+    free(arg);
+    return NULL;
+}
+
+void *__download_and_send(void *arg) {
+    session_data_t *session = arg;
+    request_context_t *request_context = create_request_context(session->request, session->manager, session->context);
+    const int response_code = send_http_request(request_context);
+    if (__check_response_code(response_code) == 0) {
+        char *cachename = parse_request_to_cachename(session->request);
+        save_cache(session->manager, cachename);
+        free(cachename);
+    }
+    free(session);
+    return NULL;
+}
+
+void * __share_cache(void *arg) {
+    session_data_t *session = arg;
+    char *cachename = parse_request_to_cachename(session->request);
+    share_cache(session->manager, cachename, session->context);
+    free(cachename);
+    free(session);
+    return NULL;
+}
+
+session_data_t * __create_session_data(subscription_manager_t *manager, http_request_t *request, proxy_context_t *context) {
+    session_data_t *session = malloc(sizeof(session_data_t));
+    if (session == NULL) {
+        perror("malloc session context");
+        return NULL;
+    }
+    session->request = request;
+    session->manager = manager;
+    session->context = context;
+    return session;
+}
+
+int __recv(const int fd, char *buffer) {
+    const int bytes_read = recv(fd, buffer, HTTP_REQUEST_BYTES_LEN - 1, 0);
     if (bytes_read < 0) {
         perror("recv");
         return -1;
@@ -116,31 +152,30 @@ int receive_client_request(const int client_socket, char *buffer) {
     return 0;
 }
 
-int fetch_and_cache_request(const http_request_t *request, const char *cache_filename, const int fd) {
-    FILE *cache_file = fopen(cache_filename, "ab");
-    if (!cache_file) return -1;
-    request_context_t context;
-    // context.id = fd;
-    // context.out = cache_file;
-    context.downloaded = 0;
-    const int err = send_http_request(request, &context);
-    fclose(cache_file);
-    return err;
-}
-
-void serve_cached_file(const char *cache_filename, const int client_socket) {
-    FILE *output_file = fopen(cache_filename, "rb");
-    if (output_file) {
-        write_file_to_fd(output_file, client_socket, 1);
-        if (ferror(output_file)) {
-            perror("Error reading from file");
-        }
-        fclose(output_file);
-    } else {
-        perror("Error opening cache file");
+int __validate_request(const http_request_t *request) {
+    if (request == NULL) {
+        return -1;
     }
+    if (
+        (strncmp(request->version, "HTTP/1.0", HTTP_VERSION_LEN) != 0 &&
+         strncmp(request->version, "HTTP/1.1", HTTP_VERSION_LEN) != 0)
+        || strncmp(request->path, "http://o.pki.goog/we2", HTTP_PATH_LEN) == 0
+    ) {
+        return -1;
+    }
+    return 0;
 }
 
-int validate_request(const http_request_t *request) {
-    return strncmp(request->version, SUPPORTED_VERSION, strlen(SUPPORTED_VERSION)) == 0;
+int __check_cache(const http_request_t *request) {
+    char *cachename = parse_request_to_cachename(request);
+    const int result = cache_exists(cachename);
+    free(cachename);
+    return result;
+}
+
+int __check_response_code(const int code) {
+    if (code >= 200 && code < 300) {
+        return 0;
+    }
+    return -1;
 }

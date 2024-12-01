@@ -20,6 +20,9 @@ typedef struct _Queue {
 	qnode_t *first;
 	qnode_t *last;
 
+	pthread_mutex_t lock;
+	sem_t empty;
+	sem_t full;
 	pthread_t qmonitor_tid;
 
 	int count;
@@ -30,12 +33,10 @@ typedef struct _Queue {
 	long get_attempts;
 	long add_count;
 	long get_count;
-
-	sem_t semaphore;
 } queue_t;
 
 queue_t* queue_init(int max_count);
-void queue_destroy(queue_t *q);
+void queue_destroy(queue_t **q);
 int queue_add(queue_t *q, int val);
 int queue_get(queue_t *q, int *val);
 void queue_print_stats(queue_t *q);

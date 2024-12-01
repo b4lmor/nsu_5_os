@@ -7,8 +7,8 @@ int asc_count = 0;
 int asc_iter = 0;
 
 void *asc_routine(void *args) {
-    linked_list_t *ll = args;
-    while (true) {
+    const linked_list_t *ll = args;
+    while (!ll->stop) {
         pthread_spin_lock(&ll->first->sync);
         node_t *prev = ll->first;
         while (prev->next != NULL) {
@@ -30,9 +30,9 @@ int desc_count = 0;
 int desc_iter = 0;
 
 void *desc_routine(void *args) {
-    linked_list_t *ll = args;
+    const linked_list_t *ll = args;
 
-    while (true) {
+    while (!ll->stop) {
         pthread_spin_lock(&ll->first->sync);
         node_t *prev = ll->first;
         while (prev->next != NULL) {
@@ -54,9 +54,9 @@ int eq_count = 0;
 int eq_iter = 0;
 
 void *eq_routine(void *args) {
-    linked_list_t *ll = args;
+    const linked_list_t *ll = args;
 
-    while (true) {
+    while (!ll->stop) {
         pthread_spin_lock(&ll->first->sync);
         node_t *prev = ll->first, *cur;
         while (prev->next != NULL) {
@@ -78,9 +78,9 @@ int swap_count = 0;
 int swap_iter = 0;
 
 void *swap_routine(void *args) {
-    linked_list_t *ll = args;
+    const linked_list_t *ll = args;
 
-    while (true) {
+    while (!ll->stop) {
         pthread_spin_lock(&ll->first->sync);
         node_t *prev = ll->first, *cur, *next;
         while (prev->next != NULL) {
@@ -113,7 +113,7 @@ void *swap_routine(void *args) {
 }
 
 void *print_routine(void *args) {
-    while (true) {
+    while (!((linked_list_t *)args)->stop) {
         sleep(1);
         printf("asc: %d/%d,\t\tdesc: %d/%d,\t\teq: %d/%d,\t\tswap: %d/%d\n", asc_count, asc_iter, desc_count, desc_iter,
                eq_count, eq_iter, swap_count, swap_iter);

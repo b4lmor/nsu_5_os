@@ -3,18 +3,19 @@
 #include "routine.h"
 #include "../list/list.h"
 
+
 int asc_count = 0;
 int asc_iter = 0;
 
 void *asc_routine(void *args) {
-    linked_list_t *ll = args;
+    const linked_list_t *ll = args;
 
-    while (true) {
+    while (!ll->stop) {
         pthread_rwlock_rdlock(&ll->first->sync);
-        node_t *prev = ll->first, *cur;
+        node_t *prev = ll->first;
         while (prev->next != NULL) {
-            cur = prev->next;
-            int size = strlen(prev->val);
+            node_t *cur = prev->next;
+            const int size = strlen(prev->val);
             pthread_rwlock_rdlock(&cur->sync);
             pthread_rwlock_unlock(&prev->sync);
             if (size < strlen(cur->val)) {
@@ -31,14 +32,14 @@ int desc_count = 0;
 int desc_iter = 0;
 
 void *desc_routine(void *args) {
-    linked_list_t *ll = args;
+    const linked_list_t *ll = args;
 
-    while (true) {
+    while (!ll->stop) {
         pthread_rwlock_rdlock(&ll->first->sync);
-        node_t *prev = ll->first, *cur;
+        node_t *prev = ll->first;
         while (prev->next != NULL) {
-            cur = prev->next;
-            int size = strlen(prev->val);
+            node_t *cur = prev->next;
+            const int size = strlen(prev->val);
             pthread_rwlock_rdlock(&cur->sync);
             pthread_rwlock_unlock(&prev->sync);
             if (size > strlen(cur->val)) {
@@ -55,14 +56,14 @@ int eq_count = 0;
 int eq_iter = 0;
 
 void *eq_routine(void *args) {
-    linked_list_t *ll = args;
+    const linked_list_t *ll = args;
 
-    while (true) {
+    while (!ll->stop) {
         pthread_rwlock_rdlock(&ll->first->sync);
-        node_t *prev = ll->first, *cur;
+        node_t *prev = ll->first;
         while (prev->next != NULL) {
-            cur = prev->next;
-            int size = strlen(prev->val);
+            node_t *cur = prev->next;
+            const int size = strlen(prev->val);
             pthread_rwlock_rdlock(&cur->sync);
             pthread_rwlock_unlock(&prev->sync);
             if (size == strlen(cur->val)) {
@@ -81,9 +82,9 @@ int swap_iter = 0;
 void *swap_routine(void *args) {
     linked_list_t *ll = args;
 
-    while (true) {
+    while (!ll->stop) {
         pthread_rwlock_rdlock(&ll->first->sync);
-        node_t *prev = ll->first, *cur, *next;
+        node_t *prev = ll->first, *cur;
         while (prev->next != NULL) {
             if (rand() % 100 != 0) {
                 cur = prev->next;
@@ -94,7 +95,7 @@ void *swap_routine(void *args) {
             }
             cur = prev->next;
             pthread_rwlock_wrlock(&cur->sync);
-            next = cur->next;
+            node_t *next = cur->next;
             if (next == NULL) {
                 pthread_rwlock_unlock(&cur->sync);
                 break;
@@ -116,11 +117,10 @@ void *swap_routine(void *args) {
 }
 
 void *print_routine(void *args) {
-    while (true) {
+    while (!((linked_list_t *)args)->stop) {
         sleep(1);
         printf("asc: %d/%d,\t\tdesc: %d/%d,\t\teq: %d/%d,\t\tswap: %d/%d\n", asc_count, asc_iter, desc_count, desc_iter,
                eq_count, eq_iter, swap_count, swap_iter);
     }
 }
-
 #endif

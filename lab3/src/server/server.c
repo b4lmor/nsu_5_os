@@ -7,7 +7,7 @@
 #include "../../include/server.h"
 #include "../../include/handler.h"
 
-int start_server(const int port, proxy_context_t *context) {
+int start_server(proxy_context_t *context) {
     struct sockaddr_in server_addr, client_addr;
     socklen_t client_len = sizeof(client_addr);
 
@@ -20,7 +20,7 @@ int start_server(const int port, proxy_context_t *context) {
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(port);
+    server_addr.sin_port = htons(context->port);
 
     if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         perror("bind");
@@ -28,13 +28,13 @@ int start_server(const int port, proxy_context_t *context) {
         return EXIT_FAILURE;
     }
 
-    listen(server_socket, CONNECTIONS_NUMBER);
+    listen(server_socket, PENDING_CONNECTIONS_NUMBER);
 
     char server_ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &server_addr.sin_addr, server_ip, sizeof(server_ip));
-    printf("[SERVER] :: Listening on socket %s:%d ...\n", server_ip, port);
+    printf("[SERVER] :: Listening on socket %s:%d ...\n", server_ip, context->port);
 
-    while (1) {
+    while (!context->stop) {
         const int client_socket = accept(server_socket, (struct sockaddr *) &client_addr, &client_len);
         if (client_socket < 0) {
             perror("accept");
