@@ -1,3 +1,9 @@
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
 #include "list/list.h"
 #include "routine/routine.h"
 
@@ -19,12 +25,20 @@ int main() {
     }
 
     pthread_t tid[7];
-    void* (*routines[7])(void*) = {asc_routine, desc_routine, eq_routine, print_routine, swap_routine, swap_routine, swap_routine};
-    void* args[7] = {ll, ll, ll, ll, ll, ll, ll};
+    void* (*routines[7])(void*) = {
+        asc_routine,
+        desc_routine,
+        eq_routine,
+        print_routine,
+        swap_routine,
+        swap_routine,
+        swap_routine
+    };
+
     int broken = 7;
 
     for (int i = 0; i < 7; ++i) {
-        if (pthread_create(&tid[i], NULL, routines[i], args[i])) {
+        if (pthread_create(&tid[i], NULL, routines[i], ll)) {
             printf("main: pthread_create()\n");
             broken = i;
             goto wait;

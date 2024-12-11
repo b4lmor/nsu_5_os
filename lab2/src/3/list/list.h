@@ -1,25 +1,14 @@
 #ifndef LIST_H
 #define LIST_H
 
-#include <stdlib.h>
-#include <pthread.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
+#include "../lock/lock.h"
 
 #define MAX_STRING_LENGTH 100
 #define STORAGE_SIZE 1000
 
 typedef struct _node_t {
     struct _node_t *next;
-#ifdef USE_SPINLOCK
-    pthread_spinlock_t sync;
-#elifdef USE_MUTEX
-    pthread_mutex_t sync;
-#elifdef USE_RWLOCK
-    pthread_rwlock_t sync;
-#endif
+    custom_lock_t lock;
     char val[MAX_STRING_LENGTH];
 } node_t;
 

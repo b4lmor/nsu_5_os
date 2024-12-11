@@ -18,6 +18,5 @@ void spinlock_lock(my_spinlock_t* s) {
 
 void spinlock_unlock(my_spinlock_t *s) {
     int expected = STATUS_LOCK;
-    atomic_compare_exchange_strong(s, &expected, STATUS_UNLOCK); // todo: why atomic?
-    // *s = STATUS_UNLOCK;
+    atomic_compare_exchange_strong(s, &expected, STATUS_UNLOCK);
 }

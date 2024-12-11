@@ -37,7 +37,7 @@ void *desc_routine(void *args) {
         node_t *prev = ll->first;
         while (prev->next != NULL) {
             node_t *cur = prev->next;
-            int size = strlen(prev->val);
+            const int size = strlen(prev->val);
             pthread_spin_lock(&cur->sync);
             pthread_spin_unlock(&prev->sync);
             if (size > strlen(cur->val)) {
@@ -108,7 +108,7 @@ void *swap_routine(void *args) {
             prev = next;
         }
         pthread_spin_unlock(&prev->sync);
-        ++swap_iter; // unsafe
+        ++swap_iter;
     }
 }
 

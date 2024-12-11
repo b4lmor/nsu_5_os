@@ -78,7 +78,6 @@ void destroy_threadpool(threadpool_t **pool) {
     pthread_mutex_lock(&(*pool)->mutex);
     (*pool)->stop = 1;
     pthread_cond_broadcast(&(*pool)->cond);
-
     pthread_mutex_unlock(&(*pool)->mutex);
 
     for (int i = 0; i < MAX_THREADS; i++) {

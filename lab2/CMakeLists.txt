@@ -21,13 +21,22 @@ add_executable(lab2_2_semaphore src/2/queue_threads.c src/2/queue_semaphore/queu
 target_compile_definitions(lab2_2_semaphore PRIVATE USE_QUEUE_SEMAPHORE)
 
 
-add_executable(lab2_3_spinlock src/3/main.c src/3/list/list.h src/3/list/list.c src/3/routine/routine.h src/3/routine/routine_spinlock.c)
+add_executable(lab2_3_spinlock src/3/main.c
+        src/3/list/list.h src/3/list/list.c
+        src/3/routine/routine.h src/3/routine/routine.c
+        src/3/lock/lock.h src/3/lock/lock.c)
 target_compile_definitions(lab2_3_spinlock PRIVATE USE_SPINLOCK)
 
-add_executable(lab2_3_mutex src/3/main.c src/3/list/list.h src/3/list/list.c src/3/routine/routine.h src/3/routine/routine_mutex.c)
+add_executable(lab2_3_mutex src/3/main.c
+        src/3/list/list.h src/3/list/list.c
+        src/3/routine/routine.h src/3/routine/routine.c
+        src/3/lock/lock.h src/3/lock/lock.c)
 target_compile_definitions(lab2_3_mutex PRIVATE USE_MUTEX)
 
-add_executable(lab2_3_rwlock src/3/main.c src/3/list/list.h src/3/list/list.c src/3/routine/routine.h src/3/routine/routine_rwlock.c)
+add_executable(lab2_3_rwlock src/3/main.c src/3/main.c
+        src/3/list/list.h src/3/list/list.c
+        src/3/routine/routine.h src/3/routine/routine.c
+        src/3/lock/lock.h src/3/lock/lock.c)
 target_compile_definitions(lab2_3_rwlock PRIVATE USE_RWLOCK)
 
 

@@ -31,7 +31,8 @@ typedef struct _Queue {
     long get_count;
 
     pthread_mutex_t mutex;
-    pthread_cond_t condvar;
+    pthread_cond_t condvar_reader;
+    pthread_cond_t condvar_writer;
 } queue_t;
 
 queue_t *queue_init(int max_count);

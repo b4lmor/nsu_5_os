@@ -17,10 +17,6 @@
 #elifdef USE_QUEUE_SEMAPHORE
 #include "queue_semaphore/queue.h"
 #endif
-//
-// queue stats: current size 0; attempts: (127130 353399473 -353272343); counts (127130 127130 0)
-// System time: 537 milliseconds
-// User time:   7036 milliseconds
 
 #define RED "\033[41m"
 #define NOCOLOR "\033[0m"
@@ -29,10 +25,10 @@
 #define CPU_WRITER 2
 
 #define QUEUE_CAPACITY 1000000
-#define CANCEL_TIME_SEC 2000
+#define CANCEL_TIME_SEC 20000
 #define USE_SCHED_YIELD 1
 #define PROFILE_TIME 1
-#define EMULATE_SLEEP 1
+#define EMULATE_SLEEP 0
 
 void set_cpu(const int n) {
     cpu_set_t cpuset;

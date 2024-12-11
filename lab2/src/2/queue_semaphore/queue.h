@@ -35,6 +35,24 @@ typedef struct _Queue {
 	long get_count;
 } queue_t;
 
+// wait() {
+// 	while(1) {
+// 		atomic {
+// 			if (v > 0) {
+// 				v--;
+// 				return;
+// 			}
+// 		}
+// 	}
+// }
+
+// post() {
+// 	atomic {
+// 		v++;
+// 		return;
+// 	}
+// }
+
 queue_t* queue_init(int max_count);
 void queue_destroy(queue_t **q);
 int queue_add(queue_t *q, int val);

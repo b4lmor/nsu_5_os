@@ -28,4 +28,4 @@ add_executable(lab1_5_a src/5/a.c)
 
 add_executable(lab1_6_a src/6/a.c src/6/my_thread/my_thread.h src/6/my_thread/my_thread.c)
 
-add_executable(lab1_7_a src/7/a.c)
+add_executable(lab1_7 src/7/main.c src/7/uthreadpool.c src/7/uthreadpool.h)

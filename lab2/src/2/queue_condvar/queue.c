@@ -34,7 +34,8 @@ queue_t *queue_init(int max_count) {
     q->add_count = q->get_count = 0;
 
     pthread_mutex_init(&q->mutex, NULL);
-    pthread_cond_init(&q->condvar, NULL);
+    pthread_cond_init(&q->condvar_reader, NULL);
+    pthread_cond_init(&q->condvar_writer, NULL);
 
     err = pthread_create(&q->qmonitor_tid, NULL, qmonitor, q);
     if (err) {
@@ -64,7 +65,7 @@ void queue_destroy(queue_t *q) {
 int queue_add(queue_t *q, const int val) {
     pthread_mutex_lock(&q->mutex);
     while (q->count == q->max_count) {
-        pthread_cond_wait(&q->condvar, &q->mutex);
+        pthread_cond_wait(&q->condvar_writer, &q->mutex);
     }
 
     q->add_attempts++;
@@ -93,7 +94,7 @@ int queue_add(queue_t *q, const int val) {
     q->count++;
     q->add_count++;
 
-    pthread_cond_signal(&q->condvar);
+    pthread_cond_signal(&q->condvar_reader);
     pthread_mutex_unlock(&q->mutex);
     return 1;
 }
@@ -101,7 +102,7 @@ int queue_add(queue_t *q, const int val) {
 int queue_get(queue_t *q, int *val) {
     pthread_mutex_lock(&q->mutex);
     while (q->count == 0) {
-        pthread_cond_wait(&q->condvar, &q->mutex); // todo
+        pthread_cond_wait(&q->condvar_reader, &q->mutex);
     }
 
     q->get_attempts++;
@@ -122,7 +123,7 @@ int queue_get(queue_t *q, int *val) {
     q->count--;
     q->get_count++;
 
-    pthread_cond_signal(&q->condvar);
+    pthread_cond_signal(&q->condvar_writer);
     pthread_mutex_unlock(&q->mutex);
     return 1;
 }

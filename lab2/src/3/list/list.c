@@ -1,19 +1,16 @@
 #include "list.h"
 
+#include <stdlib.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
 node_t *create_node(const char *val) {
     node_t *node = malloc(sizeof(node_t));
-
     strncpy(node->val, val, MAX_STRING_LENGTH);
     node->next = NULL;
-
-#ifdef USE_SPINLOCK
-    pthread_spin_init(&node->sync, PTHREAD_PROCESS_SHARED);
-#elifdef USE_MUTEX
-    pthread_mutex_init(&node->sync, NULL);
-#elifdef USE_RWLOCK
-    pthread_rwlock_init(&node->sync, NULL);
-#endif
-
+    lock_init(&node->lock);
     return node;
 }
 
