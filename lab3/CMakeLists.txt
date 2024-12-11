@@ -33,12 +33,3 @@ add_executable(c-proxy
 target_link_libraries(c-proxy ${CURL_LIBRARIES})
 target_include_directories(c-proxy PRIVATE ${CURL_INCLUDE_DIRS})
 target_compile_definitions(c-proxy PRIVATE PARALLEL)
-
-add_executable(test test/main.c
-        include/threadpool.h
-        src/threadpool/threadpool.c
-)
-
-target_link_libraries(test ${CURL_LIBRARIES})
-target_include_directories(test PRIVATE ${CURL_INCLUDE_DIRS})
-
