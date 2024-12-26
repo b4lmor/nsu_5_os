@@ -1,4 +1,5 @@
 #include "../../include/threadpool.h"
+#include "../../include/log.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,16 +28,25 @@ void *worker(void *arg) {
 
         pthread_mutex_unlock(&pool->mutex);
 
+        logssi("POOL", "Starting task with id", task->id);
         task->function(task->argument);
+        logssi("POOL", "Finished task with id", task->id);
     }
 
     return NULL;
 }
 
-threadpool_t *init_threadpool() {
+threadpool_t *init_threadpool(int threads) {
     threadpool_t *pool = malloc(sizeof(threadpool_t));
     if (pool == NULL) {
         perror("malloc threadpool");
+        return NULL;
+    }
+
+    pool->threads = malloc(sizeof(pthread_t) * threads);
+    if (pool->threads == NULL) {
+        perror("malloc pthread_t");
+        free(pool);
         return NULL;
     }
 
@@ -64,6 +74,7 @@ void threadpool_push_task(threadpool_t *pool, void (*function)(void *), void *ar
     new_last_task->argument = argument;
     new_last_task->next = NULL;
     new_last_task->prev = pool->last_task;
+    new_last_task->id = pool->id_sequence++;
     if (pool->last_task != NULL) {
         pool->last_task->next = new_last_task;
     }

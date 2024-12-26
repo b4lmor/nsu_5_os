@@ -21,6 +21,10 @@ void logiss(const int id, const char *msg, const char *value) {
     printf("[%d] :: %s %s\n", id, msg, value);
 }
 
+void logssi(const char *id, const char *msg, const int value) {
+    printf("[%s] :: %s %d\n", id, msg, value);
+}
+
 void logsss(const char *id, const char *msg, const char *value) {
     printf("[%s] :: %s %s\n", id, msg, value);
 }

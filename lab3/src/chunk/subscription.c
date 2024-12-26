@@ -125,26 +125,51 @@ void finish_pending_chunks(subscription_manager_t *manager) {
 // @synchronized
 void add_chunk(subscription_manager_t *manager, const void *data, const size_t element_size, const size_t size,
                proxy_context_t *proxy_context) {
+    logis(manager->first_subscriber->fd, "lock ...");
     pthread_mutex_lock(&manager->lock);
+    logis(manager->first_subscriber->fd, "lock ... done");
+
+    logis(manager->first_subscriber->fd, "adding chunk ...");
     __add_chunk(manager->container, data, element_size, size);
+    logis(manager->first_subscriber->fd, "adding chunk ... done");
+
+    logis(manager->first_subscriber->fd, "sending chunks ...");
     __send_chunks(manager, proxy_context);
+    logis(manager->first_subscriber->fd, "sending chunks ... done");
+
+    logis(manager->first_subscriber->fd, "waiting for subscribers ...");
     // wait for all
     while (manager->flag > 0) {
         pthread_cond_wait(&manager->cond, &manager->lock);
     }
+    logis(manager->first_subscriber->fd, "waiting for subscribers ... done");
+
     pthread_mutex_unlock(&manager->lock);
+    logis(manager->first_subscriber->fd, "unlock ... done");
 }
 
 void __send_chunks(subscription_manager_t *manager, const proxy_context_t *proxy_context) {
     subscriber_t *current_subscriber = manager->first_subscriber;
+    manager->flag = manager->subscribers_count;
+
     while (current_subscriber != NULL) {
         if (current_subscriber->chunk_loaded == manager->container->count) {
+            pthread_mutex_lock(&manager->lock);
+            logis(current_subscriber->fd, "waiting for manager lock ... done");
+            manager->flag--;
+            pthread_cond_signal(&manager->cond);
+            pthread_mutex_unlock(&manager->lock);
             goto next;
         }
 
         subscription_info_t *info = malloc(sizeof(subscription_info_t));
         if (info == NULL) {
             perror("malloc subscription_info_t");
+            pthread_mutex_lock(&manager->lock);
+            logis(current_subscriber->fd, "waiting for manager lock ... done");
+            manager->flag--;
+            pthread_cond_signal(&manager->cond);
+            pthread_mutex_unlock(&manager->lock);
             goto next;
         }
 
@@ -152,11 +177,10 @@ void __send_chunks(subscription_manager_t *manager, const proxy_context_t *proxy
         info->manager = manager;
 
 #ifdef PARALLEL
-        threadpool_push_task(proxy_context->pool, __send_chunks_to_subscriber, info);
-        info->manager->flag = info->manager->subscribers_count;
+        threadpool_push_task(proxy_context->upload_pool, __send_chunks_to_subscriber, info);
 #else
-        __send_chunks_to_subscriber(info);
         info->manager->flag = 0;
+        __send_chunks_to_subscriber(info);
 #endif
     next:
         current_subscriber = current_subscriber->next;
@@ -168,14 +192,18 @@ void __send_chunks(subscription_manager_t *manager, const proxy_context_t *proxy
 void *__send_chunks_to_subscriber(subscription_info_t *subscription_info) {
     subscription_manager_t *manager = subscription_info->manager;
     subscriber_t *subscriber = subscription_info->subscriber;
+    const int fd = subscription_info->subscriber->fd;
 
+    logis(fd, "waiting for lock ...");
     pthread_mutex_lock(&subscriber->lock);
+    logis(fd, "waiting for lock ... done");
 
     const int start_chunk = subscriber->chunk_loaded;
     const int last_chunk = manager->container->count;
 
     const chunk_t *current_chunk = get_chunk(manager->container, start_chunk);
     if (!current_chunk) {
+        logis(fd, "no chunks");
         goto end;
     }
     for (int i = start_chunk; i < last_chunk; i++) {
@@ -187,13 +215,18 @@ void *__send_chunks_to_subscriber(subscription_info_t *subscription_info) {
         subscriber->chunk_loaded++;
     }
 end:
-
+    logis(fd, "waiting for manager lock ...");
     pthread_mutex_lock(&manager->lock);
+    logis(fd, "waiting for manager lock ... done");
+    logis(fd, "decreasing flag ...");
     manager->flag--;
     pthread_cond_signal(&manager->cond);
     pthread_mutex_unlock(&manager->lock);
+    logis(fd, "manager unlock");
 
     pthread_mutex_unlock(&subscriber->lock);
+    logis(fd, "unlock");
+
     free(subscription_info);
     return NULL;
 }

@@ -29,12 +29,14 @@ uthread_scheduler_t *init_scheduler() {
 
 int add_to_scheduler(uthread_scheduler_t *scheduler, void (*func)(void *), void *arg) {
     const uthread_node_t *node = scheduler->head_uthread;
-    while (node != NULL && node->uthread->status != IDLE) {
+    int cnt = 0;
+    while (cnt < scheduler->size && node->uthread->status != IDLE) {
         node = node->next;
+        cnt++;
     }
 
     uthread_t *uthread;
-    if (node == NULL) {
+    if (cnt >= scheduler->size) {
         if (__create_uthread(scheduler)) {
             return -1;
         }
@@ -58,12 +60,14 @@ int add_to_scheduler(uthread_scheduler_t *scheduler, void (*func)(void *), void 
 }
 
 void usched_yield(uthread_scheduler_t *scheduler) {
-    uthread_node_t *node = scheduler->head_uthread;
-    while (node != NULL && node->uthread->status != READY) {
+    uthread_node_t *node = scheduler->active_uthread == NULL ? scheduler->head_uthread : scheduler->active_uthread;
+    int cnt = 0;
+    while (node->uthread->status != READY && cnt < scheduler->size - 1) {
         node = node->next;
+        cnt++;
     }
 
-    if (node == NULL) {
+    if (cnt >= scheduler->size - 1) {
         scheduler->is_finished = 1;
         setcontext(&scheduler->initial_context);
         return;
@@ -91,11 +95,13 @@ void run_scheduler(uthread_scheduler_t *scheduler) {
     }
 
     uthread_node_t *node = scheduler->head_uthread;
-    while (node != NULL && node->uthread->status != READY) {
+    int cnt = 0;
+    while (cnt < scheduler->size && node->uthread->status != READY) {
         node = node->next;
+        cnt++;
     }
 
-    if (node == NULL) {
+    if (cnt >= scheduler->size) {
         return;
     }
 
@@ -112,13 +118,15 @@ void reset_scheduler(uthread_scheduler_t *scheduler) {
 void destroy_scheduler(uthread_scheduler_t **scheduler_ptr) {
     uthread_scheduler_t *scheduler = *scheduler_ptr;
     uthread_node_t *node = scheduler->head_uthread;
-    while (node != NULL) {
+    int cnt = 0;
+    while (cnt < scheduler->size) {
         uthread_t *uthread = node->uthread;
         munmap(uthread->stack, STACK_SIZE);
         free(uthread);
         uthread_node_t *tmp = node->next;
         free(node);
         node = tmp;
+        cnt++;
     }
     free(scheduler);
     *scheduler_ptr = NULL;
@@ -172,11 +180,15 @@ int __create_uthread(uthread_scheduler_t *scheduler) {
     }
 
     node->uthread = uthread;
-    node->prev = NULL;
-    node->next = scheduler->head_uthread;
 
-    if (scheduler->head_uthread != NULL) {
-        scheduler->head_uthread->prev = node;
+    if (scheduler->head_uthread == NULL) {
+        node->prev = node;
+        node->next = node;
+    } else {
+        node->next = scheduler->head_uthread->next;
+        node->prev = scheduler->head_uthread;
+        scheduler->head_uthread->next->prev = node;
+        scheduler->head_uthread->next = node;
     }
     scheduler->head_uthread = node;
 

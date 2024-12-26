@@ -9,11 +9,6 @@ hashmap_t *create_table() {
         perror("Failed to allocate memory for hashmap_t");
         return NULL;
     }
-    ht->table = malloc(sizeof(node_t *) * TABLE_SIZE);
-    if (ht->table == NULL) {
-        perror("Failed to allocate memory for hashmap_t");
-        return NULL;
-    }
     for (int i = 0; i < TABLE_SIZE; i++) {
         ht->table[i] = NULL;
     }
@@ -45,7 +40,7 @@ void *get(hashmap_t *ht, const char *key) {
     return NULL;
 }
 
-void delete(const hashmap_t *ht, const char *key) {
+void delete(hashmap_t *ht, const char *key) {
     const unsigned int index = hashn(key, MAX_KEY_LENGTH) % TABLE_SIZE;
     node_t *current = ht->table[index];
     node_t *previous = NULL;
@@ -76,7 +71,6 @@ void destroy_hashmap(hashmap_t **ht) {
             free(temp);
         }
     }
-    free((*ht)->table);
     free(*ht);
     *ht = NULL;
 }

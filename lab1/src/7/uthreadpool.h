@@ -7,6 +7,7 @@
 typedef enum uthread_status {
     IDLE,
     READY,
+    RUNNING,
     TERMINATED
 } uthread_status_t;
 

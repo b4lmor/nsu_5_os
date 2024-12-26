@@ -33,7 +33,7 @@ add_executable(lab2_3_mutex src/3/main.c
         src/3/lock/lock.h src/3/lock/lock.c)
 target_compile_definitions(lab2_3_mutex PRIVATE USE_MUTEX)
 
-add_executable(lab2_3_rwlock src/3/main.c src/3/main.c
+add_executable(lab2_3_rwlock src/3/main.c
         src/3/list/list.h src/3/list/list.c
         src/3/routine/routine.h src/3/routine/routine.c
         src/3/lock/lock.h src/3/lock/lock.c)

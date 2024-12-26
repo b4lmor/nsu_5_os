@@ -22,7 +22,9 @@ __http_method_t __parse_method(const char *str);
 
 static size_t callback(const void *contents, const size_t size, const size_t nmemb, void *userp) {
     const request_context_t *context = userp;
-    add_chunk(context->manager, contents, size, nmemb, context->proxy_context);
+    logss(context->request->path, "adding chunk ...");
+    add_chunk(context->manager, contents, nmemb, size, context->proxy_context);
+    logss(context->request->path, "adding chunk ... done");
     return size * nmemb;
 }
 
@@ -91,7 +93,10 @@ int send_http_request(request_context_t *context) {
     curl_easy_setopt(curl, CURLOPT_XFERINFODATA, context);
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
 
+    logss("CURL", "performing curl ...");
     const CURLcode res = curl_easy_perform(curl);
+    logss("CURL", "performing curl ... done");
+
     if (res != CURLE_OK) {
         fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
     } else {

@@ -39,7 +39,7 @@ int handle_client(const int client_socket, proxy_context_t *context) {
     data->context = context;
     data->fd = client_socket;
 #ifdef PARALLEL
-    threadpool_push_task(context->pool, __handle_client, data);
+    threadpool_push_task(context->handler_pool, __handle_client, data);
 #else
     __handle_client(data);
 #endif
@@ -74,6 +74,7 @@ void *__handle_client(void *arg) {
 
     subscription_manager_t *manager = get(data->context->map, request->path);
     if (manager == NULL) {
+        logis(fd, "manager not found");
         manager = create_subscription_manager();
         if (manager == NULL) {
             close(fd);
@@ -85,6 +86,7 @@ void *__handle_client(void *arg) {
     subscribe(manager, fd);
 
     if (cas(&manager->is_busy, 0, 1)) { // true => this thread is session main thread
+        logis(fd, "manager is not busy");
         session_data_t *session = __create_session_data(manager, request, data->context);
         if (session == NULL) {
             destroy_subscription_manager(&manager);
@@ -98,9 +100,11 @@ void *__handle_client(void *arg) {
             logis(fd, "cache file found!");
             __share_cache(session);
         }
+        logis(fd, "request complete! finishing ...");
         finish_pending_chunks(manager);
         destroy_subscription_manager(&manager);
         delete(data->context->map, request->path);
+        logis(fd, "request complete! finishing ... done");
     }
 end:
     free(request);
@@ -111,10 +115,14 @@ end:
 void *__download_and_send(void *arg) {
     session_data_t *session = arg;
     request_context_t *request_context = create_request_context(session->request, session->manager, session->context);
+    logss(session->request->path, "sending request...");
     const int response_code = send_http_request(request_context);
+    logss(session->request->path, "sending request... done");
     if (__check_response_code(response_code) == 0) {
         char *cachename = parse_request_to_cachename(session->request);
+        logss(session->request->path, "saving cache ...");
         save_cache(session->manager, cachename);
+        logss(session->request->path, "saving cache ... done");
         free(cachename);
     }
     free(session);

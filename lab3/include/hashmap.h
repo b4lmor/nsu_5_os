@@ -11,7 +11,7 @@ typedef struct node {
 } node_t;
 
 typedef struct hashmap {
-    node_t **table;
+    node_t *table[TABLE_SIZE];
 } hashmap_t;
 
 hashmap_t *create_table();
@@ -20,7 +20,7 @@ void insert(hashmap_t *ht, const char *key, void *value);
 
 void *get(hashmap_t *ht, const char *key);
 
-void delete(const hashmap_t *ht, const char *key);
+void delete(hashmap_t *ht, const char *key);
 
 void destroy_hashmap(hashmap_t **ht);
 

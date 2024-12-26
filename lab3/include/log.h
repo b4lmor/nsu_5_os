@@ -9,6 +9,8 @@ void logisi(int id, const char *msg, int value);
 
 void logiss(int id, const char *msg, const char *value);
 
+void logssi(const char *id, const char *msg, int value);
+
 void logsss(const char *id, const char *msg, const char *value);
 
 void logurls(const char *url, const char *msg);

@@ -4,35 +4,38 @@
 
 #include "uthreadpool.h"
 
-#define TASKS 100
+#define TASKS 10
+
+typedef struct args {
+    uthread_scheduler_t *scheduler;
+    int id;
+} args_t;
 
 int cnt = 0;
 
-void *foo(void *arg) {
-    cnt++;
-    // sleep(1);
-    cnt++;
-    return NULL;
-}
-
 void *foo_with_scheduling(void *arg) {
-    uthread_scheduler_t *scheduler = arg;
+    args_t *args = arg;
+    printf("%d -> ", args->id);
     cnt++;
-    usched_yield(scheduler);
+    usched_yield(args->scheduler);
+    printf("%d -> ", args->id);
     cnt++;
     return NULL;
 }
 
 int main(void) {
     uthread_scheduler_t *scheduler = init_scheduler();
+    args_t args[TASKS];
 
     for (int i = 0; i < TASKS; i++) {
-        add_to_scheduler(scheduler, foo_with_scheduling, scheduler);
+        args[i].scheduler = scheduler;
+        args[i].id = i;
+        add_to_scheduler(scheduler, foo_with_scheduling, &args[i]);
     }
 
     run_scheduler(scheduler);
 
-    printf("COUNT = %d\n", cnt);
+    printf("\nCOUNT = %d\n", cnt);
 
     // reset_scheduler(scheduler);
 

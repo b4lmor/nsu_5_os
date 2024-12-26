@@ -13,6 +13,8 @@ typedef enum compare_type {
 
 void *__compare_routine(void *args, __compare_type_t compare_type, int *iter, int *count);
 
+char __needs_swap();
+
 int asc_count = 0;
 int asc_iter = 0;
 
@@ -41,54 +43,37 @@ void *swap_routine(void *args) {
     linked_list_t *ll = args;
 
     while (!ll->stop) {
-        read_lock(&ll->first->lock);
+        write_lock(&ll->first->lock);
 
         node_t *prev = ll->first, *cur;
         while (prev->next != NULL) {
-            if (rand() % 100 != 0) {
+            if (!__needs_swap()) {
                 cur = prev->next;
-
-                read_lock(&cur->lock);
-
+                write_lock(&cur->lock);
                 unlock(&prev->lock);
-
                 prev = cur;
                 continue;
             }
-
             cur = prev->next;
-
             write_lock(&cur->lock);
-
             node_t *next = cur->next;
             if (next == NULL) {
                 unlock(&cur->lock);
                 break;
             }
-
             write_lock(&next->lock);
-
             prev->next = next;
-
             unlock(&prev->lock);
-
             cur->next = next->next;
-
             unlock(&cur->lock);
-
             next->next = cur;
             swap_count++;
             prev = next;
-
-            unlock(&prev->lock);
-
-            read_lock(&prev->lock);
         }
-
         unlock(&prev->lock);
-
         swap_iter++;
     }
+    return NULL;
 }
 
 void *print_routine(void *args) {
@@ -112,10 +97,8 @@ void *__compare_routine(void *args, __compare_type_t compare_type, int *iter, in
         while (prev->next != NULL) {
             node_t *cur = prev->next;
             const int size = strnlen(prev->val, MAX_STRING_LENGTH);
-
             read_lock(&cur->lock);
             unlock(&prev->lock);
-
             switch (compare_type) {
                 case ASC:
                     if (size < strlen(cur->val)) {
@@ -133,13 +116,14 @@ void *__compare_routine(void *args, __compare_type_t compare_type, int *iter, in
                     }
                     break;
             }
-
             prev = cur;
         }
-
         unlock(&prev->lock);
-
         (*iter)++;
     }
     return NULL;
+}
+
+char __needs_swap() {
+    return rand() % 100 == 0;
 }

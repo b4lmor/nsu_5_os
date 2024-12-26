@@ -37,6 +37,10 @@ void lock_init(custom_lock_t *lock) {
     pthread_mutex_init(&lock->sync, NULL);
 #elifdef USE_RWLOCK
     pthread_rwlock_init(&lock->sync, NULL);
+#elifdef USE_MY_RWLOCK
+    my_rwlock_init(&lock->sync, NULL);
 #endif
 }
+
+
 

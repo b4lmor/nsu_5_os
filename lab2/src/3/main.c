@@ -8,17 +8,26 @@
 #include "routine/routine.h"
 
 int main() {
+
+#ifdef USE_SPINLOCK
+    printf("spinlock\n");
+#elifdef USE_MUTEX
+    printf("mutex\n");
+#elifdef USE_RWLOCK
+    printf("rwlock\n");
+#endif
+
     linked_list_t *ll = malloc(sizeof(linked_list_t));
     ll->stop = false;
     srand(time(NULL));
     char val[MAX_STRING_LENGTH] = {0};
-    memset(val, '0', rand() % (MAX_STRING_LENGTH - 1));
+    memset(val, 'x', rand() % (MAX_STRING_LENGTH - 1));
     ll->first = create_node(val);
 
     node_t *last = ll->first;
     for (int i = 1; i < STORAGE_SIZE; ++i) {
         memset(val, 0, MAX_STRING_LENGTH);
-        memset(val, '0', rand() % (MAX_STRING_LENGTH - 1));
+        memset(val, 'x', rand() % (MAX_STRING_LENGTH - 1));
         node_t *newNode = create_node(val);
         last->next = newNode;
         last = newNode;
@@ -37,7 +46,7 @@ int main() {
 
     int broken = 7;
 
-    for (int i = 0; i < 7; ++i) {
+    for (int i = 0; i < 7; i++) {
         if (pthread_create(&tid[i], NULL, routines[i], ll)) {
             printf("main: pthread_create()\n");
             broken = i;
